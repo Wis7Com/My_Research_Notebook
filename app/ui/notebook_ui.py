@@ -218,16 +218,16 @@ You have access to source documents uploaded by the user.
 Instructions:
 - ONLY answer based on the provided context. Do NOT use any external knowledge.
 - If the requested information is not in the provided context, say: "This information is not available in the selected sources."
-- When citing sources, use the filename: [Filename, Page Y]
-- Example: [Prel. Doc. No 3B, Page 17]
+- When citing sources, use the EXACT filename shown in [Source N: Filename] headers
+- Copy the filename VERBATIM - do not abbreviate or simplify it
+- Example: [[EG 2nd meeting Nov 2024] US, Consolidated Submissions, Page 2]
 - Quote exact text with quotation marks when referencing specific passages
 - Be precise and use legal/technical terminology appropriately
 - Format responses with clear structure (headings, bullets) when helpful
 
 For exact quotes:
 - Provide verbatim text from the Knowledge Base Context
-- Always include DocID and page number
-- The context above contains the full searchable text
+- Always include the filename and page number in citations
 
 IMPORTANT: You must NEVER provide information that is not explicitly present in the context provided above."""
 
@@ -299,8 +299,10 @@ IMPORTANT: You must NEVER provide information that is not explicitly present in 
 
         rows = []
         for doc in documents:
+            source_path = doc.get("source_path", "")
+            filename = Path(source_path).stem if source_path else doc.get("title", "Unknown")
             rows.append([
-                doc.get("title", "Unknown")[:50],
+                filename[:50],
                 doc.get("parent_folder", "")[:20],
                 doc.get("total_chunks", 0),
                 doc.get("doc_id", ""),
@@ -316,11 +318,12 @@ IMPORTANT: You must NEVER provide information that is not explicitly present in 
 
         choices = []
         for doc in documents:
-            title = doc.get("title", "Unknown")[:40]
+            source_path = doc.get("source_path", "")
+            filename = Path(source_path).stem if source_path else doc.get("title", "Unknown")
             phase = doc.get("parent_folder", "")[:15]
             chunks = doc.get("total_chunks", 0)
             doc_id = doc.get("doc_id", "")
-            label = f"{title} | {phase} ({chunks} chunks)"
+            label = f"{filename} | {phase} ({chunks} chunks)"
             choices.append((label, doc_id))
 
         return choices
@@ -664,9 +667,21 @@ IMPORTANT: You must NEVER provide information that is not explicitly present in 
                     )
             if results:
                 context_parts.append("\n=== Knowledge Base Context ===")
+
+                # Build doc_id -> source_path lookup for fallback
+                doc_info_cache = {}
+                for doc in self.chroma_client.list_documents():
+                    doc_info_cache[doc.get("doc_id", "")] = doc.get("source_path", "")
+
                 for i, result in enumerate(results, 1):
                     metadata = result["metadata"]
                     source_path = metadata.get("source_path", "")
+
+                    # Fallback: lookup source_path by doc_id if missing
+                    if not source_path:
+                        doc_id = metadata.get("doc_id", "")
+                        source_path = doc_info_cache.get(doc_id, "")
+
                     filename = Path(source_path).stem if source_path else metadata.get("title", "Unknown")
                     context_parts.append(
                         f"\n[Source {i}: {filename}]\n"
@@ -980,9 +995,16 @@ IMPORTANT: You must NEVER provide information that is not explicitly present in 
         with gr.Blocks(title="My Research Notebook") as interface:
             gr.Markdown("# My Research Notebook")
 
+            # Sidebar visibility state
+            sidebar_visible = gr.State(True)
+
+            # Toggle button row
+            with gr.Row():
+                toggle_sidebar_btn = gr.Button("◀ Hide Sources", size="sm", scale=0, min_width=120)
+
             with gr.Row():
                 # ===== Left Panel: Sources & Settings =====
-                with gr.Column(scale=1):
+                with gr.Column(scale=1, visible=True) as left_panel:
                     # System Prompt Section (collapsed by default)
                     with gr.Accordion("📋 Project Instructions", open=False):
                         system_prompt_box = gr.Textbox(
@@ -1005,38 +1027,38 @@ IMPORTANT: You must NEVER provide information that is not explicitly present in 
 
                     gr.Markdown("---")
 
-                    # Sources Section with CheckboxGroup
-                    gr.Markdown("### 📚 Sources")
-                    stats_display = gr.Markdown(value=self.get_stats_text())
+                    # Sources Section with CheckboxGroup (collapsible)
+                    with gr.Accordion("📚 Sources", open=True):
+                        stats_display = gr.Markdown(value=self.get_stats_text())
 
-                    # Compact control row: Add + Select All + None + Delete
-                    with gr.Row():
-                        source_file = gr.UploadButton(
-                            "➕",
-                            file_types=[".pdf", ".md", ".txt", ".xml", ".docx"],
-                            file_count="multiple",
-                            size="sm",
-                            scale=0,
-                            min_width=50,
+                        # Compact control row: Add + Select All + None + Delete
+                        with gr.Row():
+                            source_file = gr.UploadButton(
+                                "➕",
+                                file_types=[".pdf", ".md", ".txt", ".xml", ".docx"],
+                                file_count="multiple",
+                                size="sm",
+                                scale=0,
+                                min_width=50,
+                            )
+                            select_all_btn = gr.Button("✅ All", size="sm", scale=1)
+                            deselect_all_btn = gr.Button("⬜ None", size="sm", scale=1)
+                            delete_selected_btn = gr.Button("🗑️", variant="stop", size="sm", scale=0, min_width=40)
+
+                        add_status = gr.Markdown(value="")
+
+                        # Initialize CheckboxGroup with current choices at creation time
+                        # (Gradio 6.x compatibility - interface.load may not trigger reliably)
+                        initial_choices = self.get_sources_choices()
+                        sources_checkbox = gr.CheckboxGroup(
+                            choices=initial_choices,
+                            label="Select sources for RAG context",
+                            value=[],
+                            interactive=True,
+                            elem_id="sources-checkbox-container",
                         )
-                        select_all_btn = gr.Button("✅ All", size="sm", scale=1)
-                        deselect_all_btn = gr.Button("⬜ None", size="sm", scale=1)
-                        delete_selected_btn = gr.Button("🗑️", variant="stop", size="sm", scale=0, min_width=40)
 
-                    add_status = gr.Markdown(value="")
-
-                    # Initialize CheckboxGroup with current choices at creation time
-                    # (Gradio 6.x compatibility - interface.load may not trigger reliably)
-                    initial_choices = self.get_sources_choices()
-                    sources_checkbox = gr.CheckboxGroup(
-                        choices=initial_choices,
-                        label="Select sources for RAG context",
-                        value=[],
-                        interactive=True,
-                        elem_id="sources-checkbox-container",
-                    )
-
-                    sources_status = gr.Markdown(value="")
+                        sources_status = gr.Markdown(value="")
 
                     gr.Markdown("---")
 
@@ -1095,6 +1117,18 @@ IMPORTANT: You must NEVER provide information that is not explicitly present in 
                         clear_chat_btn = gr.Button("🗑️ Chat", size="sm")
 
             # ===== Event Handlers =====
+
+            # Toggle sidebar visibility
+            def toggle_sidebar(visible):
+                new_visible = not visible
+                btn_text = "▶ Show Sources" if not new_visible else "◀ Hide Sources"
+                return new_visible, gr.update(visible=new_visible), btn_text
+
+            toggle_sidebar_btn.click(
+                fn=toggle_sidebar,
+                inputs=[sidebar_visible],
+                outputs=[sidebar_visible, left_panel, toggle_sidebar_btn],
+            )
 
             # Update system prompt
             update_prompt_btn.click(
