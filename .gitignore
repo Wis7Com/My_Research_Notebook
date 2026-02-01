@@ -1,0 +1,31 @@
+# Source documents (too large for git)
+sources_raw/
+
+# Vector database
+data/
+
+# Python virtual environment
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment variables
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+
+# Claude Code
+CLAUDE.md
+.claude/
