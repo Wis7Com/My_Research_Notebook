@@ -1,8 +1,12 @@
 # My Research Notebook - Local RAG Application
 
-![My Research Notebook](docs/my_research_notebook_thumbnail_v3.png)
+<img src="docs/my_research_notebook_thumbnail_v3.png" alt="My Research Notebook" width="300">
 
 A general-purpose RAG (Retrieval-Augmented Generation) application for research document drafting. Upload PDFs and other documents, build a searchable vector database, and chat with multiple LLM providers using your knowledge base as context.
+
+## Screenshots
+
+![My Research Notebook UI](docs/screenshot.png)
 
 ## Features
 
