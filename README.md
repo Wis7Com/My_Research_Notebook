@@ -1,6 +1,6 @@
 # My Research Notebook - Local RAG Application
 
-![My Research Notebook Screenshot](docs/screenshot.png)
+![My Research Notebook](docs/my_research_notebook_thumbnail_v3.png)
 
 A general-purpose RAG (Retrieval-Augmented Generation) application for research document drafting. Upload PDFs and other documents, build a searchable vector database, and chat with multiple LLM providers using your knowledge base as context.
 
@@ -45,13 +45,17 @@ Only `OPENAI_API_KEY` is required for embeddings. Other keys are optional based 
 
 ### 3. Add Source Documents
 
-Place your documents in the `sources_raw/` directory (supports PDF, DOCX, TXT, MD, XML):
+Create a `sources_raw/` directory and add your documents (supports PDF, DOCX, TXT, MD, XML):
+```bash
+mkdir -p sources_raw
+```
+
+You can organize documents in subdirectories as needed (e.g., by topic, date, or type). The application will recursively discover all documents:
 ```
 sources_raw/
-├── meeting_notes/
-├── research_papers/
-├── reports/
-└── additional/
+├── your_topic_1/
+├── your_topic_2/
+└── ...
 ```
 
 The `--phase` filter accepts partial folder name matches for targeted searches.
@@ -178,7 +182,7 @@ Source Documents (sources_raw/)
 ├── data/                   # Generated data
 │   ├── chroma_db/          # Vector database
 │   └── citations/          # BibTeX files
-├── sources_raw/            # Source documents
+├── sources_raw/            # Your source documents (create this directory)
 └── outputs/                # Generated outputs
 ```
 
